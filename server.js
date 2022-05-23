@@ -28,7 +28,11 @@ const db = mysql.createConnection(
 
 //Database call that returns all rows in SELECTED * FROM
 app.get("/api/candidates", (req, res) => {
-  const sql = `SELECT * FROM candidates`;
+    const sql = `SELECT candidates.*, parties.name 
+    AS party_name 
+    FROM candidates 
+    LEFT JOIN parties 
+    ON candidates.party_id = parties.id`;
 
   db.query(sql, (err, rows) => {
     if (err) {
@@ -44,7 +48,13 @@ app.get("/api/candidates", (req, res) => {
 
 //GET a single candidate using an api route
 app.get("/api/candidate/:id", (req, res) => {
-  const sql = `SELECT * FROM candidates WHERE id = ?`;
+    const sql = `SELECT candidates.*, parties.name 
+    AS party_name 
+    FROM candidates 
+    LEFT JOIN parties 
+    ON candidates.party_id = parties.id 
+    WHERE candidates.id = ?`;
+
   const params = [req.params.id];
 
   db.query(sql, params, (err, row) => {
@@ -132,6 +142,95 @@ db.query(sql, params, (err, result) => {
 // }
 //console.log(result);
 //});
+
+//PUT OR UPDATE A CANDIDATES PARTY
+app.put('/api/candidate/:id', (req, res) => {
+    const errors = inputCheck(req.body, "party_id"); // inputChecker fuction made by module
+
+    if (errors) {
+      res.status(400).json({ error: errors });
+      return;
+    }
+    
+    const sql = `UPDATE candidates SET party_id = ? 
+                 WHERE id = ?`;
+    const params = [req.body.party_id, req.params.id]; //FYI The affected row's id should always be part of the route/we should be extra sure that a party_id was provided before we attempt to update the database
+
+    db.query(sql, params, (err, result) => {
+      if (err) {
+        res.status(400).json({ error: err.message });
+        // check if a record was found
+      } else if (!result.affectedRows) {
+        res.json({
+          message: 'Candidate not found'
+        });
+      } else {
+        res.json({
+          message: 'success',
+          data: req.body,
+          changes: result.affectedRows
+        });
+      }
+    });
+  });
+
+
+
+// GET route for all parties:
+app.get('/api/parties', (req, res) => {
+    const sql = `SELECT * FROM parties`;
+    db.query(sql, (err, rows) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json({
+        message: 'success',
+        data: rows
+      });
+    });
+  });
+
+// GET route for a single party:
+app.get('/api/party/:id', (req, res) => {
+    const sql = `SELECT * FROM parties WHERE id = ?`;
+    const params = [req.params.id];
+    db.query(sql, params, (err, row) => {
+      if (err) {
+        res.status(400).json({ error: err.message });
+        return;
+      }
+      res.json({
+        message: 'success',
+        data: row
+      });
+    });
+  });
+
+//DELETE PARTIES:
+app.delete('/api/party/:id', (req, res) => {
+    const sql = `DELETE FROM parties WHERE id = ?`;
+    const params = [req.params.id];
+    db.query(sql, params, (err, result) => {
+      if (err) {
+        res.status(400).json({ error: res.message });
+        // checks if anything was deleted
+      } else if (!result.affectedRows) {
+        res.json({
+          message: 'Party not found'
+        });
+      } else {
+        res.json({
+          message: 'deleted',
+          changes: result.affectedRows,
+          id: req.params.id
+        });
+      }
+    });
+  });
+
+
+
 
 //route to handle user requests that arent supported by my app !! Make sure this is the last route always
 app.use((req, res) => {
